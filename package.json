@@ -1,0 +1,25 @@
+{
+  "name": "picgo-plugin-sharp",
+  "version": "1.0.0",
+  "description": "",
+  "main": "dist/index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "tsc -p ."
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "fs-extra": "^10.0.1",
+    "image-size": "^1.0.1",
+    "sharp": "^0.30.2"
+  },
+  "devDependencies": {
+    "@types/node": "^17.0.21",
+    "@types/sharp": "^0.29.5",
+    "picgo": "^1.5.0-alpha.0",
+    "request": "^2.88.2",
+    "typescript": "^4.6.2"
+  }
+}
