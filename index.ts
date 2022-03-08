@@ -106,8 +106,11 @@ const handle = async (ctx: IPicGo): Promise<any> => {
         const name: string = realBaseName(item);
         const extname: string = "." + outputType;
         const {width, height} = imageSize(originBuffer);
+        if (originBuffer.length < transformBuffer.length) {
+          ctx.log.warn("it seems that the size of pic handled by sharp is bigger than origin pic.");
+        }
         ctx.output.push({
-          buffer: transformBuffer,
+          buffer: originBuffer.length < transformBuffer.length ? originBuffer : transformBuffer,
           fileName: name + extname,
           width: width,
           height: height,
