@@ -1,8 +1,8 @@
-import {readFile} from "fs-extra";
-import {imageSize} from "image-size";
-import {basename, extname} from "path";
-import {IPicGo, IPluginConfig} from "picgo";
-import {Response} from "request";
+import axios from "axios";
+import { readFile } from "fs/promises";
+import { imageSize } from "image-size";
+import { basename, extname } from "path";
+import { IPicGo, IPluginConfig } from "picgo";
 
 import sharp, {
   AvifOptions,
@@ -11,22 +11,27 @@ import sharp, {
   JpegOptions,
   PngOptions,
   WebpOptions,
-  SharpOptions
+  SharpOptions,
 } from "sharp";
 
 const PLUGIN_NAME = "picgo-plugin-sharp";
 
 const fetch = async (ctx: IPicGo, url: string): Promise<Buffer> => {
-  return ctx
-    .request({method: "Get", url, encoding: null})
-    .on("response", (response: Response) => {
-      const contentType = response.headers["content-type"];
+  return axios
+    .get(url, {
+      responseType: "arraybuffer",
+    })
+    .then((resp) => {
+      const contentType = resp.headers["content-type"];
       if (!contentType.includes("image")) {
-        ctx.log.error("headers:\n" + JSON.stringify(response.headers, null, 2));
+        ctx.log.error(
+          `ContentType header of request from url: ${url} is ${contentType}, is not a image contentType.`
+        );
         throw new Error(
-          `${url} isn't a image, resp header ${response.headers}`
+          `${url} isn't a image, resp contentType header: ${contentType}`
         );
       }
+      return resp.data as Buffer;
     });
 };
 
@@ -50,7 +55,7 @@ type Configs = {
 type SharpConfigs = {
   outputOptions?: TransformOptions;
   inputOptions: SharpOptions;
-}
+};
 type TransformType = "jpeg" | "png" | "gif" | "webp" | "avif" | "heif";
 type TransformOptions =
   | JpegOptions
@@ -61,13 +66,23 @@ type TransformOptions =
   | HeifOptions;
 
 const createTransformFn = (type: TransformType) => {
-  return async (buffer: Buffer, outputOptions: TransformOptions, inputOptions: SharpOptions) => {
+  return async (
+    buffer: Buffer,
+    outputOptions: TransformOptions,
+    inputOptions: SharpOptions
+  ) => {
     return await sharp(buffer, inputOptions)[type](outputOptions).toBuffer();
   };
 };
 
-const transformFnMap: Record<TransformType,
-  (buffer: Buffer, outputOptions: TransformOptions, inputOptions: SharpOptions) => Promise<Buffer>> = {
+const transformFnMap: Record<
+  TransformType,
+  (
+    buffer: Buffer,
+    outputOptions: TransformOptions,
+    inputOptions: SharpOptions
+  ) => Promise<Buffer>
+> = {
   jpeg: createTransformFn("jpeg"),
   png: createTransformFn("png"),
   gif: createTransformFn("gif"),
@@ -78,7 +93,7 @@ const transformFnMap: Record<TransformType,
 
 const handle = async (ctx: IPicGo): Promise<any> => {
   const cfg = ctx.getConfig<Configs>(PLUGIN_NAME);
-  const sharpCfg = ctx.getConfig <SharpConfigs>("sharp");
+  const sharpCfg = ctx.getConfig<SharpConfigs>("sharp");
   const outputType: TransformType = cfg?.outputType ?? "webp";
   const outputOptions = sharpCfg?.outputOptions?.[outputType];
   const inputOptions = sharpCfg?.inputOptions?.[outputType];
@@ -96,7 +111,11 @@ const handle = async (ctx: IPicGo): Promise<any> => {
           : await readFile(item);
         let transformBuffer = originBuffer;
         try {
-          transformBuffer = await transformFn(originBuffer, outputOptions, inputOptions);
+          transformBuffer = await transformFn(
+            originBuffer,
+            outputOptions,
+            inputOptions
+          );
           ctx.log.success(`${item} convert to ${outputType} successful`);
         } catch (e) {
           ctx.log.error(`can't convert file ${item}`);
@@ -105,12 +124,17 @@ const handle = async (ctx: IPicGo): Promise<any> => {
 
         const name: string = realBaseName(item);
         const extname: string = "." + outputType;
-        const {width, height} = imageSize(originBuffer);
+        const { width, height } = imageSize(originBuffer);
         if (originBuffer.length < transformBuffer.length) {
-          ctx.log.warn("it seems that the size of pic handled by sharp is bigger than origin pic.");
+          ctx.log.warn(
+            "it seems that the size of pic handled by sharp is bigger than origin pic."
+          );
         }
         ctx.output.push({
-          buffer: originBuffer.length < transformBuffer.length ? originBuffer : transformBuffer,
+          buffer:
+            originBuffer.length < transformBuffer.length
+              ? originBuffer
+              : transformBuffer,
           fileName: name + extname,
           width: width,
           height: height,
@@ -125,7 +149,7 @@ const handle = async (ctx: IPicGo): Promise<any> => {
 
 const config = (ctx: IPicGo): IPluginConfig[] => {
   const pluginConfig = ctx.getConfig<Configs>(PLUGIN_NAME);
-  const {outputType = "avif"} = pluginConfig ?? {};
+  const { outputType = "avif" } = pluginConfig ?? {};
   return [
     {
       alias: "压缩格式",
